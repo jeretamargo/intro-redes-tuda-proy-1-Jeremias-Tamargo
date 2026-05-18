@@ -9,7 +9,14 @@ PORT=5000
 def enviar_comando():
     while True:
         try:
-         comando = input("shell> ")
+         
+         comando = input("shell>")
+         if comando.strip() == "exit":
+            client.send(comando.encode('utf-8'))
+            print("Conexión remota finalizada")
+            client.close()
+            sys.exit(0)
+         
 
          client.send(comando.encode('utf-8'))
         except (socket.error, OSError):
@@ -21,7 +28,7 @@ def recibir_salida():
         try:
             salida = client.recv(1024).decode('utf-8')
             
-            sys.stdout.write(f"\r{salida}\n> ")
+            print(f"\n{salida}")
             sys.stdout.flush()
         except (socket.error, OSError):
             print('\n[Conexión perdida con el servidor]')
