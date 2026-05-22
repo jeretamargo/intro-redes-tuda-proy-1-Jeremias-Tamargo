@@ -42,9 +42,9 @@ En el caso se ser menos de 10 clientes totales, el servidor acepta al cliente, l
 
 - En el caso de un `cat *archivo*`, es necesario primero dividir el comando en 2, para separar el comando del argumento. Dentro de un try-except utilizamos split y dividimos el comando en el primer espacio que encuentre para poder acceder al argumento. Una vez, obtenido el argumento, utilizamos la funcion open() para abrir el archivo, le pasamos el argumento anteriormente extraido del comando (nombre del archivo), la funcion de lectura (r) y el formato en el que queremos leer (utf-8), finalmente guardamos el contenido del archivo con la funcion .read() y se lo enviamos al cliente. Este bloque utiliza un with para manejar automaticamente el cerrado del archivo luego de utilizarlo. Luego le siguen dos except que manejan casos de error en donde el archivo no exista o suceda alguna otra excepcion del S.O
 
--En el caso de un `help` se devuelve la ayuda de los comandos disponibles en el servidor, sus variantes son la ayuda extendida del uso y funcionamiento de los diferentes comandos que provee el servidor (`help cat / help ls / help pwd etc`)
+- En el caso de un `help` se devuelve la ayuda de los comandos disponibles en el servidor, sus variantes son la ayuda extendida del uso y funcionamiento de los diferentes comandos que provee el servidor (`help cat / help ls / help pwd etc`)
 
--En el caso de un `mkdir` se crea una carpeta en la raiz del servidor, primero se extrae el argumento (nombre de nueva carpeta), luego se arma el path donde sera creado uniendo el directorio actual del servidor y el nombre de la nueva carpeta, finalmente, con el metodo `os.mkdir(path)` se crea la carpeta con el nombre enviado por el cliente
+- En el caso de un `mkdir` se crea una carpeta en la raiz del servidor, primero se extrae el argumento (nombre de nueva carpeta), luego se arma el path donde sera creado uniendo el directorio actual del servidor y el nombre de la nueva carpeta, finalmente, con el metodo `os.mkdir(path)` se crea la carpeta con el nombre enviado por el cliente
 
 - Si ninguno el comando enviado por el cliente no entra en ninguno de los 3 casos anteriores, el servidor envía un mensaje de error indicando que el comando recibido no es reconocido
 
