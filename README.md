@@ -8,6 +8,14 @@ Este proyecto consiste en un servicio de Shell Remoto casero implementado purame
 
 El proyecto consiste en 2 scripts: uno encargado de las funcionalidades del cliente y otro de las funcionalidades del servidor:
 
+#### Nueva versión:
+Esta 2da versión fue refactirizada, eliminando los hilos dentro del script cliente y agregando las siguientes caracterisitcas:
+- Capacidad de servidor hasta 10 clientes
+- Autenticación por usuario
+- comando `mkdir` agregado
+- comando `help` agregado
+- comando `ls` extendido
+  
 ### `cli_shell.py`
 
 El funcionamiento paso a paso del cliente es el siguiente:
