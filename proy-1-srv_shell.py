@@ -3,37 +3,42 @@ import socket
 import threading
 import os
 import stat
+import db
+import protocolo as proto
+import ssl
 
 ip ="127.0.0.1"
 port = 5000
 
 clientes = []
+clientes_lock = threading.Lock()
 
-usuarios = {
-    "jere": "jere123",
-    "marcos": "marcos123",
-    "seba": "seba123",
-    "aby": "aby123",
-    "lucas": "lucas123",
-    "mat": "mat123",
-    "ariel": "ariel123",
-    "luka": "luka123",
-    "guille": "guille123"
-}
 
 def ejecutar_comandos(cliente, address):
+    actual_path = os.getcwd()
    
     while True:
         try:
-            comando = cliente.recv(1024).decode('utf-8')
+            comando = proto.recibir_mensaje(cliente)
             comando = comando.strip()
             print(f"|{address}| Ejecuto el comando: {comando}")
             match comando:
                 case "exit":
-                    cliente.shutdown(socket.SHUT_RDWR)
-                    clientes.remove(cliente)
+                    with clientes_lock:
+                        cliente.shutdown(socket.SHUT_RDWR)
+                        clientes.remove(cliente)
                     break
                 case _ if comando.startswith("ls"):
+
+                    if (
+                    "/" in comando
+                    or "\\" in comando
+                    or ".." in comando
+                    or ":" in comando
+                    ):
+                        salida = "Error al ejecutar comando ls:  No se permiten rutas"
+                        proto.enviar_mensaje(cliente, salida)
+                        break
 
                     comando = comando.split()
                     
@@ -42,19 +47,20 @@ def ejecutar_comandos(cliente, address):
                     
                         if comando[0] == "ls":
 
-                            archivos = os.listdir()
+                            archivos = os.listdir(path=actual_path)
 
                             if archivos:
                                 salida = "\n".join(archivos) #join() sirve para separar elementos de una lista, en este caso con un salto de linea
                             else:
                                 salida = "[Directorio vacío]"
 
-                            cliente.send(salida.encode("utf-8"))
+                            proto.enviar_mensaje(cliente, salida)
+                            
                     if len(comando) == 2:
 
                         if  comando[1] == "-l":
                             salida = ""
-                            for archivo in os.scandir("."):
+                            for archivo in os.scandir(path=actual_path):
                                 info = archivo.stat()
 
                                 
@@ -64,7 +70,7 @@ def ejecutar_comandos(cliente, address):
         
                                 salida += (f"{archivo.name} {permisos} {tamaño} {fecha}  \n")
                             
-                            cliente.send(salida.encode("utf-8"))
+                            proto.enviar_mensaje(cliente, salida)
                         
                         elif  comando[1] == "-lh" or comando[1] == "-hl":
                             """
@@ -77,7 +83,7 @@ def ejecutar_comandos(cliente, address):
                                         return f"{bytes:.1f}{unidad}"
                                     bytes /= 1024
                             
-                            for archivo in os.scandir("."):
+                            for archivo in os.scandir(path=actual_path):
                                     info = archivo.stat()
                                     
                                     permisos = stat.filemode(info.st_mode)
@@ -85,7 +91,7 @@ def ejecutar_comandos(cliente, address):
                                     fecha = datetime.fromtimestamp(info.st_mtime)
 
                                     salida += (f"{archivo.name} {permisos} {tamaño} {fecha}  \n")
-                            cliente.send(salida.encode("utf-8"))
+                            proto.enviar_mensaje(cliente, salida)
 
                       
                             
@@ -98,12 +104,16 @@ def ejecutar_comandos(cliente, address):
                                 else:
                                     salida = "[Directorio vacío]"
 
-                                cliente.send(salida.encode("utf-8"))
+                                proto.enviar_mensaje(cliente, salida)
                             except NotADirectoryError:
-                                cliente.send("Error Al ejecutar el comando ls: Está intentando listar un archivo, no un directorio".encode("utf-8"))
+                                salida = "Error Al ejecutar el comando ls: Está intentando listar un archivo, no un directorio"
+                                proto.enviar_mensaje(cliente, salida)
+                                
 
                             except FileNotFoundError:
-                                cliente.send("Error Al ejecutar el comando ls: Archivo no encontrado".encode("utf-8"))
+                                salida="Error Al ejecutar el comando ls: Archivo no encontrado"
+                                proto.enviar_mensaje(cliente, salida)
+                                
 
                     if len(comando) == 3:
                         
@@ -123,13 +133,19 @@ def ejecutar_comandos(cliente, address):
             
                                     salida += (f"{archivo.name} {permisos} {tamaño} {fecha}  \n")
                                 
-                                cliente.send(salida.encode("utf-8"))
+                                proto.enviar_mensaje(cliente, salida)
                             except NotADirectoryError:
-                                cliente.send("Error Al ejecutar el comando ls: Está intentando listar un archivo, no un directorio".encode("utf-8"))
+                                salida="Error Al ejecutar el comando ls: Está intentando listar un archivo, no un directorio"
+                                proto.enviar_mensaje(cliente, salida)
+                                
                             except FileNotFoundError:
-                                cliente.send("Error Al ejecutar el comando ls: Archivo no encontrado".encode("utf-8"))
+                                salida = "Error Al ejecutar el comando ls: Archivo no encontrado"
+                                proto.enviar_mensaje(cliente, salida)
+                                
                             except Exception as e:
-                                cliente.send(f"Excepción del lado servidor al ejecutar ls: {str(e)}".encode("utf-8"))
+                                salida = f"Excepción del lado servidor al ejecutar ls: {str(e)}"
+                                proto.enviar_mensaje(cliente, salida)
+                                
 
                         
                         elif  comando[2] == "-lh" or comando[2] == "-hl":
@@ -152,44 +168,64 @@ def ejecutar_comandos(cliente, address):
                                         fecha = datetime.fromtimestamp(info.st_mtime)
 
                                         salida += (f"{archivo.name} {permisos} {tamaño} {fecha}  \n")
-                                cliente.send(salida.encode("utf-8"))
+                                proto.enviar_mensaje(cliente, salida)
 
                             except NotADirectoryError:
-                                cliente.send("Error Al ejecutar el comando ls: Está intentando listar un archivo, no un directorio".encode("utf-8"))    
+                                salida ="Error Al ejecutar el comando ls: Está intentando listar un archivo, no un directorio"
+                                proto.enviar_mensaje(cliente, salida)
+                                  
                             except FileNotFoundError:
-                                cliente.send("Error Al ejecutar el comando ls: Archivo no encontrado".encode("utf-8"))
+                                salida = "Error Al ejecutar el comando ls: Archivo no encontrado"
+                                proto.enviar_mensaje(cliente, salida)
+                                
                             except Exception as e:
-                                cliente.send(f"Excepción del lado servidor al ejecutar ls: {str(e)}".encode("utf-8"))
+                                salida = f"Excepción del lado servidor al ejecutar ls: {str(e)}"
+                                proto.enviar_mensaje(cliente, salida)
+                                
 
                 case _ if comando.startswith("pwd"):
                     comando = comando.split()
                     if len(comando)==1:
-                        directorio = os.getcwd()
-                        cliente.send(directorio.encode("utf-8"))
+                        salida = os.getcwd()
+                        proto.enviar_mensaje(cliente, salida)
                     
 
 
                     
                 case _ if comando.startswith("cat "):
+                    if (
+                    "/" in comando
+                    or "\\" in comando
+                    or ".." in comando
+                    or ":" in comando
+                    ):
+                        salida = "Error al ejecutar comando ls:  No se permiten rutas"
+                        proto.enviar_mensaje(cliente, salida)
+                        break
+
                     try:
                         nombre_archivo = comando.split(" ", 1)[1] #divido el comando 1 sola vez entre espacios y me quedo con el primer elemento (argumento de cat)
                     
 
                         with open(nombre_archivo, "r", encoding="utf-8") as archivo: #abro el archivo con el nombre que guarde anteriormente, en modo lectura y codeado en utf 8, lo guardo en una variable archivo, with me permite cerrarlo automaticamente
-                            contenido = archivo.read()
+                            salida = archivo.read()
 
-                        cliente.send(contenido.encode("utf-8"))
+                        proto.enviar_mensaje(cliente, salida)
 
                     except FileNotFoundError:
-                        cliente.send("Error: Archivo no encontrado".encode("utf-8"))
+                        salida="Error: Archivo no encontrado"
+                        proto.enviar_mensaje(cliente, salida)
+                        
 
                     except Exception as e:
-                        cliente.send(f"Excepción del lado servidor al ejecutar cat: {str(e)}".encode("utf-8"))
-                
+                        salida = f"Excepción del lado servidor al ejecutar cat: {str(e)}"
+                        proto.enviar_mensaje(cliente, salida)
+                        
                 case _ if comando.startswith("help"):
                     comando = comando.split()
                     if len(comando) == 1:
                         salida = ("Comandos disponibles:\n"
+                                "cd\n"                                  
                                 "ls\n"
                                 "pwd\n"
                                 "cat\n"
@@ -197,10 +233,17 @@ def ejecutar_comandos(cliente, address):
                                 "mkdir\n"
                                 "exit\n"
                                 )
-                        cliente.send(salida.encode("utf-8"))
+                        proto.enviar_mensaje(cliente, salida)
 
                     if len(comando)==2:
                         match comando[1]:
+                            case "cd":
+                                salida = (
+                                "---USO BÁSICO---\n"
+                                "cd *directorio* -> Se mueve del directorio actual al especificado\n"
+                                "cd .. -> Se mueve del directorio actual al directorio padre\n"     
+                                )
+                                
                             case "ls":
                                 salida = (
                                 "---USO BÁSICO---\n"
@@ -210,48 +253,95 @@ def ejecutar_comandos(cliente, address):
                                 "ls -l -> Lista el directorio especificado de manera detallada\n"
                                 "ls -lh -> Lista el directorio especificado de manera detallada y con formato de tamaño legible\n"             
                                 )
-                                cliente.send(salida.encode("utf-8"))
+                                proto.enviar_mensaje(cliente, salida)
                             case "mkdir":
                                 salida = (
                                 "---USO BÁSICO---\n"
                                 "mkdir *directorio* -> Crea un nuevo directorio en la ubicación actual\n"  
                                 )
-                                cliente.send(salida.encode("utf-8"))
+                                proto.enviar_mensaje(cliente, salida)
                                 
                             case "cat" :
                                 salida = (
                                 "---USO BÁSICO---\n"
                                 "cat *archivo* -> Lee el contenido de un archivo\n"  
                                 )
-                                cliente.send(salida.encode("utf-8"))
+                                proto.enviar_mensaje(cliente, salida)
                                 
                             case "pwd":
                                 salida = (
                                 "---USO BÁSICO---\n"
                                 "pwd -> Muestra donde está ubicado el directorio actual\n"  
                                 )
-                                cliente.send(salida.encode("utf-8"))
+                                proto.enviar_mensaje(cliente, salida)
                             case "exit":
                                 salida = (
                                 "---USO BÁSICO---\n"
                                 "exit -> Cierra la sesión de shell remoto\n"  
                                 )
-                                cliente.send(salida.encode("utf-8"))
+                                proto.enviar_mensaje(cliente, salida)
 
                 case _ if comando.startswith("mkdir "):
+                    if (
+                    "/" in comando
+                    or "\\" in comando
+                    or ".." in comando
+                    or ":" in comando
+                    ):
+                        salida = "Error al ejecutar comando ls:  No se permiten rutas"
+                        proto.enviar_mensaje(cliente, salida)
+                        break
+
                     try:
                         nombre_directorio = comando.split(" ", 1)[1]
                         d = nombre_directorio
-                        parent_d = os.getcwd()
-                        path = os.path.join(parent_d, d)
+                        path = os.path.join(actual_path, d)
                         os.mkdir(path)
-                        cliente.send(f"Directorio {nombre_directorio} creado exitosamente en el servidor".encode("utf-8"))
+                        salida=f"Directorio {nombre_directorio} creado exitosamente en el servidor"
+                        proto.enviar_mensaje(cliente, salida)
+                        
                     except Exception as e:
-                            cliente.send(f"Excepción del lado servidor al ejecutar mkdir: {str(e)}".encode("utf-8"))
+                            salida=f"Excepción del lado servidor al ejecutar mkdir: {str(e)}"
+                            proto.enviar_mensaje(cliente, salida)
+
+                case _ if comando.startswith("cd "):
+                        
+                        if ( "/" in comando or "\\" in comando or ":" in comando ):
+                            salida = "Error al ejecutar comando ls: No se permiten rutas"
+                            proto.enviar_mensaje(cliente, salida)
+                            break
+
+                        try:
+                            directorio = comando.split(" ", 1)[1]
+                            if directorio == "..":
+                                actual_path = os.path.dirname(actual_path) #devuelve el directorio padre donde se encuentra parado actualmente
+                                salida = f"Directorio actual cambiado:{actual_path}"
+                                proto.enviar_mensaje(cliente, salida)
+                            else:
+                                lista = os.listdir(path=actual_path)
+                                path = os.path.join(actual_path,directorio )
+                                if directorio in lista and not os.path.isfile(path):
+                                    actual_path=path
+                                    salida = f"Directorio actual cambiado:{actual_path}"
+                                    proto.enviar_mensaje(cliente, salida)
+                                else:
+                                     salida = "Error - El directorio especificado no existe en el directorio actual, revisar con ls"
+                                     proto.enviar_mensaje(cliente, salida)
+
+                        except Exception as e:
+                             salida=f"Excepción del lado servidor al ejecutar mkdir: {str(e)}"
+                             proto.enviar_mensaje(cliente, salida)
+
+
+                
+
                 case _:
-                    cliente.send("Error: Comando no reconocido, intente nuevamente".encode("utf-8"))
+                    salida = "Error: Comando no reconocido, intente nuevamente"
+                    proto.enviar_mensaje(cliente, salida)
+                   
         except (socket.error, OSError):
-            clientes.remove(cliente)
+            with clientes_lock:
+                clientes.remove(cliente)
             cliente.close()
             break
 
@@ -259,15 +349,35 @@ def ejecutar_comandos(cliente, address):
 
 def recibir_conexiones():
     while True:
-        if(clientes.__len__() < 10):
-            cliente, address = server.accept()
+        
+        cliente, address = server.accept()
+        cliente_ssl = context.wrap_socket (cliente,server_side=True) #envuelve el socket de texto plano a uno con funcionalidad tls
+        permitir = False
+
+        with clientes_lock:
+
+            if len(clientes) < 5:
+                clientes.append(cliente_ssl)
+                permitir = True
+
+        if permitir:
+
             print(f"Cliente desde la IP {address} conectado al servidor")
-            clientes.append(cliente)
-            thread = threading.Thread(target=autenticar, args=(cliente,address))
+
+            thread = threading.Thread(
+                target=autenticar,
+                args=(cliente_ssl, address)
+            )
+
             thread.start()
+
         else:
-            cliente, address = server.accept()
-            cliente.send("Conexión fallida: Número máximo de clientes (10) alcanzado".encode("utf-8"))
+
+            cliente.send(
+                "Conexión fallida: Número máximo de clientes (5) alcanzado"
+                .encode("utf-8")
+            )
+
             cliente.close()
 
 def autenticar(cliente, address):
@@ -275,54 +385,72 @@ def autenticar(cliente, address):
     isUserInvalid = True
     isPasswordInvalid = True
     try:
-        cliente.send("Conexión exitosa: Bienvenido al Shell Remoto\nIntrouzca su nombre de usuario".encode("utf-8"))
+        proto.enviar_mensaje(cliente, "Conexión exitosa: Bienvenido al Shell Remoto\nIntrouzca su nombre de usuario")
+        
         
         while isUserInvalid:
-            user = cliente.recv(1024).decode('utf-8')
-            if user in usuarios:
+            username = proto.recibir_mensaje(cliente)
+            userDB = db.buscar_usuario(username)
+            print(repr(username))
+            print(type(username))
+            if userDB:
                 isUserInvalid = False
+                print(f"Resultado DB: {userDB}")
             else:
                 intentos = intentos + 1
                 if intentos < 3:
                     
-                    cliente.send("Usuario incorrecto, intente de nuevo".encode("utf-8"))
+                    proto.enviar_mensaje(cliente, "Usuario incorrecto, intente de nuevo")
+                    
                 if intentos >= 3:
-                    cliente.send("Usuario incorrecto: Desconectando del servidor".encode("utf-8"))
+                    proto.enviar_mensaje(cliente, "@kicked")
+                    
+                    with clientes_lock:
+                        clientes.remove(cliente)
                     cliente.close()
-        cliente.send("Introuzca su contraseña de usuario".encode("utf-8"))  
+        proto.enviar_mensaje(cliente, "Introuzca su contraseña de usuario")            
+        
         while isPasswordInvalid:
-            password = cliente.recv(1024).decode('utf-8')
-            if usuarios[user] == password:
+            password = proto.recibir_mensaje(cliente)
+            if db.verificar_contraseña(userDB, password):
                 isPasswordInvalid = False
-                cliente.send("@uservalid".encode("utf-8"))
+                proto.enviar_mensaje(cliente, "@uservalid")   
                 thread = threading.Thread(target=ejecutar_comandos, args=(cliente,address))
                 thread.start()
 
             else:
                 intentos = intentos + 1
                 if intentos < 3:
+                    proto.enviar_mensaje(cliente, "Contraseña incorrecta, intente de nuevo")
                     
-                    cliente.send("Contraseña incorrecta, intente de nuevo".encode("utf-8"))
                 if intentos >= 3:
-                    cliente.send("Contraseña incorrecta: Desconectando del servidor".encode("utf-8"))
+                    proto.enviar_mensaje(cliente, "@kicked")
+                    
+                    with clientes_lock:
+                        clientes.remove(cliente)
                     cliente.close()
     except(socket.error, OSError):
-            clientes.remove(cliente)
+            with clientes_lock:
+                clientes.remove(cliente)
             cliente.close()
-        
-
-    
-    
-
-        
-
-
-
-
-
+    except:
+            with clientes_lock:
+                clientes.remove(cliente)
+            cliente.close()
 
 
 server =socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+context = ssl.SSLContext(
+    ssl.PROTOCOL_TLS_SERVER
+)
+context.load_cert_chain(
+    certfile="cert.pem",
+    keyfile="key.pem"
+)
 server.bind((ip,port))
+
 server.listen()
+
+print("Servidor encendido y a la escucha de conexiones")
+
 recibir_conexiones()

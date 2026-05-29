@@ -64,3 +64,5 @@ Para probar el shell remoto:
   python proy-1-srv_shell.py
   python proy-1-cli_shell.py
 ```
+
+openssl req -x509 -newkey rsa:2048 -nodes -days 365 -keyout key.pem -out cert.pem
