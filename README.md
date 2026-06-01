@@ -22,9 +22,11 @@ Esta 3ra versión fue refactorizada, modularizando ciertas acciones del servidor
 El funcionamiento paso a paso del cliente es el siguiente:
 
 1. Crea un socket tcp con una dirección ipv4 y un puerto especifico para conectarse al servidor
-3. Dentro de un bloque try-except, intenta conectarse al server, si surgiera una excpeción devuelve un mensaje de error y finaliza la ejecucion del cliente
-4. Una vez generada la conexion, se ejecuta el metodo `autenticar()` el cual es un bucle donde el usuario debe enviar sus credenciales, el bucle se corta cuando el servidor envía la bandera @uservalid, una vez recibida la bandera, se procede a ejecutar el metodo `enviar_comando()`
-5. `enviar_comando()` ejecuta un bucle que permite al usuario enviarle comandos al servidor, si el usuario introduce el comando exit, el cliente es el que maneja la finalizacion de la conexión y la finalizacion del programa, un try-excpet maneja un posible error en el envío
+2. Crea un contexto SSL default y confia plenamente en el certificado del servidor (con fines demostrativos para el TP)
+3. Envelve la conexion con el servidor en el contexto SSL creado.
+4. Dentro de un bloque try-except, intenta conectarse al server, si surgiera una excpeción devuelve un mensaje de error y finaliza la ejecucion del cliente
+5. Una vez generada la conexion, se ejecuta el metodo `autenticar()` el cual es un bucle donde el usuario debe enviar sus credenciales, el bucle se corta cuando el servidor envía la bandera @uservalid, una vez recibida la bandera, se procede a ejecutar el metodo `enviar_comando()`
+6. `enviar_comando()` ejecuta un bucle que permite al usuario enviarle comandos al servidor, si el usuario introduce el comando exit, el cliente es el que maneja la finalizacion de la conexión y la finalizacion del programa, un try-excpet maneja un posible error en el envío
 
 ### `srv_shell.py`
 
@@ -34,8 +36,9 @@ El funcionamiento paso a paso del servidor es el siguiente:
 2. Se crea un contexto SLL y carga tanto la llave privada como el certificado
 3. El servidor se pone a la escucha y a continuacion ejecuta la funcion `recibir_conexiones()`
 
-4.`recibir_conexiones()`  ejecuta un bucle que primero asegura que la cantidad maxima de conexiones sea hasta 5, si en el array de clientes conectados hay un total de 5, acepta (envolviendolo en el contexto cifrado) al cliente pero para mandar un mensaje de conexión fallida, terminando por cerrar la conexión
-En el caso se ser menos de 5 clientes totales, el servidor acepta al cliente,envuelve la conexion en el contexto de cifrado y loguea en la consola la conexion, agrega al nuevo cliente al array de clientes y genera un hilo nuevo para validar al usuario con la funcion `autenticar()`
+4.`recibir_conexiones()`  ejecuta un bucle que primero asegura que la cantidad maxima de conexiones sea hasta 5, si en el array de clientes conectados hay un total de 5, acepta (envolviendolo en el contexto cifrado) al cliente pero para mandar un mensaje de conexión fallida, terminando por cerrar la conexión.
+
+En el caso se ser menos de 5 clientes totales, el servidor acepta al cliente, envuelve la conexión en el contexto de cifrado y loguea en la consola la conexion, agrega al nuevo cliente al array de clientes y genera un hilo nuevo para validar al usuario con la funcion `autenticar()`
 
 5. `autenticar()` utiliza dos bucles, uno primero para validar de que el usuario exista dentro del array de usuarios validos, y una vez habiendo validado el usuario, pasa a verificar con el segundo bucle que la contraseña de el usuario indicado se valida, si se falla una cantidad total de 3 veces en la ejecucion de los 2 bucles, se cierra la conexion con el usuario, si el usuario logra completar exitosamente la validación, el servidor envía la bandera @uservalid para avisar al cliente que la validación fue exitosa y procede a crear un nuevo hilo para ejecutar la función `ejecutar_comando(cliente, address)`
 
